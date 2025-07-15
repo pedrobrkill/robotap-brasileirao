@@ -120,4 +120,6 @@ if response.status_code == 200:
         st.warning("Essa funcionalidade estará disponível em breve.")
 
 else:
-    st.error("Erro ao buscar dados da API.")
+    st.error("Erro ao buscar dados da API.") 
+
+st.write(...)
