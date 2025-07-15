@@ -4,14 +4,12 @@ import pandas as pd
 from datetime import datetime
 import random
 
-# -------- CONFIGURAÇÃO --------
 st.set_page_config(page_title="Robô IA do Brasileirão", layout="wide")
 
 API_KEY = "92a41702d74e41fc85bd77effd476f44"
 headers = {'X-Auth-Token': API_KEY}
 url = "https://api.football-data.org/v4/competitions/BSA/matches"
 
-# -------- MENU LATERAL --------
 menu = st.sidebar.radio("📂 Navegação", [
     "🏟 Jogos do Dia",
     "🔮 Jogos Futuros",
@@ -19,7 +17,6 @@ menu = st.sidebar.radio("📂 Navegação", [
     "💰 Gestão de Banca (em breve)"
 ])
 
-# -------- REQUISIÇÃO --------
 response = requests.get(url, headers=headers)
 
 if response.status_code == 200:
@@ -38,7 +35,6 @@ if response.status_code == 200:
         time_b = jogo["awayTeam"]["name"]
         status = jogo["status"]
 
-        # -------- Jogos do dia (exibe apenas os de hoje) --------
         if status in ["SCHEDULED", "LIVE"] and data_jogo == hoje:
             lista_dia.append({
                 "Data": data_jogo,
@@ -48,7 +44,6 @@ if response.status_code == 200:
                 "Status": status
             })
 
-            # Simular odds e valor esperado
             odd_over25 = round(random.uniform(1.70, 2.30), 2)
             prob_estimada = 0.60
             ev = (prob_estimada * odd_over25) - 1
@@ -62,7 +57,6 @@ if response.status_code == 200:
                 "Tem valor?": valor_aposta
             })
 
-        # -------- Jogos futuros --------
         elif status == "SCHEDULED" and data_jogo > hoje:
             lista_futuros.append({
                 "Data": data_jogo,
@@ -72,7 +66,6 @@ if response.status_code == 200:
                 "Status": status
             })
 
-    # -------- EXIBIÇÃO POR ABA --------
     if menu == "🏟 Jogos do Dia":
         st.title("🏟 Jogos do Dia (Brasileirão)")
         df_dia = pd.DataFrame(lista_dia)
@@ -90,3 +83,16 @@ if response.status_code == 200:
             st.dataframe(df_futuros, use_container_width=True)
 
     elif menu == "🎯 Análise de Valor (Hoje)":
+        st.title("🎯 Análise de Valor - Over 2.5 (Somente Hoje)")
+        df_valor = pd.DataFrame(lista_valor)
+        if df_valor.empty:
+            st.info("⚠️ Nenhum jogo hoje para calcular valor.")
+        else:
+            st.dataframe(df_valor, use_container_width=True)
+
+    elif menu == "💰 Gestão de Banca (em breve)":
+        st.title("💰 Gestão de Banca")
+        st.warning("Essa funcionalidade estará disponível em breve.")
+
+else:
+    st.error("Erro ao buscar dados da API.")
