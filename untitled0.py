@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import pytz
 
@@ -31,7 +31,10 @@ if response.status_code == 200:
     utc = pytz.utc
     brasilia = pytz.timezone("America/Sao_Paulo")
 
-    hoje = datetime.now(brasilia).strftime('%Y-%m-%d')
+    agora = datetime.now(brasilia)
+    ano_atual = agora.year
+    mes_atual = agora.month
+    hoje_date = agora.date()
 
     lista_dia = []
     lista_futuros = []
@@ -44,17 +47,17 @@ if response.status_code == 200:
         utc_dt = utc.localize(utc_dt)
         # Converte para horário de Brasília
         brasilia_dt = utc_dt.astimezone(brasilia)
+        data_jogo_date = brasilia_dt.date()
 
-        data_jogo = brasilia_dt.strftime('%Y-%m-%d')
         hora_jogo = brasilia_dt.strftime('%H:%M')
-
         time_a = jogo["homeTeam"]["name"]
         time_b = jogo["awayTeam"]["name"]
         status = jogo["status"]
 
-        if status in ["SCHEDULED", "LIVE"] and data_jogo == hoje:
+        # Jogos do dia (hoje)
+        if status in ["SCHEDULED", "LIVE"] and data_jogo_date == hoje_date:
             lista_dia.append({
-                "Data": data_jogo,
+                "Data": data_jogo_date.strftime('%Y-%m-%d'),
                 "Hora": hora_jogo,
                 "Time A": time_a,
                 "Time B": time_b,
@@ -74,15 +77,20 @@ if response.status_code == 200:
                 "Tem valor?": valor_aposta
             })
 
-        elif status == "SCHEDULED" and data_jogo > hoje:
+        # Jogos futuros do mês atual (após hoje)
+        elif (status == "SCHEDULED" and
+              brasilia_dt.year == ano_atual and
+              brasilia_dt.month == mes_atual and
+              data_jogo_date > hoje_date):
             lista_futuros.append({
-                "Data": data_jogo,
+                "Data": data_jogo_date.strftime('%Y-%m-%d'),
                 "Hora": hora_jogo,
                 "Time A": time_a,
                 "Time B": time_b,
                 "Status": status
             })
 
+    # Exibição conforme menu
     if menu == "🏟 Jogos do Dia":
         st.title("🏟 Jogos do Dia (Brasileirão)")
         df_dia = pd.DataFrame(lista_dia)
@@ -92,10 +100,10 @@ if response.status_code == 200:
             st.dataframe(df_dia, use_container_width=True)
 
     elif menu == "🔮 Jogos Futuros":
-        st.title("🔮 Próximos Jogos do Brasileirão")
+        st.title(f"🔮 Próximos Jogos do Brasileirão em {ano_atual}-{mes_atual:02d}")
         df_futuros = pd.DataFrame(lista_futuros)
         if df_futuros.empty:
-            st.info("⚠️ Nenhum jogo futuro encontrado.")
+            st.info("⚠️ Nenhum jogo futuro encontrado para o restante do mês.")
         else:
             st.dataframe(df_futuros, use_container_width=True)
 
