@@ -5,14 +5,12 @@ from datetime import datetime
 import random
 import pytz
 
-# Configuração da página
 st.set_page_config(page_title="Robô IA do Brasileirão", layout="wide")
 
 API_KEY = "92a41702d74e41fc85bd77effd476f44"
 headers = {'X-Auth-Token': API_KEY}
 url = "https://api.football-data.org/v4/competitions/BSA/matches"
 
-# Menu lateral
 menu = st.sidebar.radio("📂 Navegação", [
     "🏟 Jogos do Dia",
     "🔮 Jogos Futuros",
@@ -20,7 +18,6 @@ menu = st.sidebar.radio("📂 Navegação", [
     "💰 Gestão de Banca (em breve)"
 ])
 
-# Faz a requisição
 response = requests.get(url, headers=headers)
 
 if response.status_code == 200:
@@ -35,7 +32,6 @@ if response.status_code == 200:
     mes_atual = agora.month
     hoje_date = agora.date()
 
-    # Calcula próximo mês e ano, cuidando de dezembro -> janeiro
     if mes_atual == 12:
         proximo_mes = 1
         ano_proximo_mes = ano_atual + 1
@@ -82,11 +78,11 @@ if response.status_code == 200:
                 "Tem valor?": valor_aposta
             })
 
-        # Jogos futuros do mês atual E do próximo mês (após agora)
+        # Jogos futuros do mês atual E do próximo mês (data >= hoje)
         elif (status == "SCHEDULED" and
               ((brasilia_dt.year == ano_atual and brasilia_dt.month == mes_atual) or
                (brasilia_dt.year == ano_proximo_mes and brasilia_dt.month == proximo_mes)) and
-              brasilia_dt > agora):
+              data_jogo_date >= hoje_date):
             lista_futuros.append({
                 "Data": data_jogo_date.strftime('%Y-%m-%d'),
                 "Hora": hora_jogo,
@@ -95,7 +91,6 @@ if response.status_code == 200:
                 "Status": status
             })
 
-    # Exibição conforme menu
     if menu == "🏟 Jogos do Dia":
         st.title("🏟 Jogos do Dia (Brasileirão)")
         df_dia = pd.DataFrame(lista_dia)
