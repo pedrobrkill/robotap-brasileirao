@@ -69,4 +69,3 @@ if response.status_code == 200:
             lista_valor.append({
                 "Time A": time_a,
                 "Time B": time_b,
-                "
