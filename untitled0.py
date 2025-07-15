@@ -27,7 +27,6 @@ if response.status_code == 200:
     dados = response.json()
     partidas = dados['matches']
 
-    # Fuso horários
     utc = pytz.utc
     brasilia = pytz.timezone("America/Sao_Paulo")
 
@@ -36,16 +35,22 @@ if response.status_code == 200:
     mes_atual = agora.month
     hoje_date = agora.date()
 
+    # Calcula próximo mês e ano, cuidando de dezembro -> janeiro
+    if mes_atual == 12:
+        proximo_mes = 1
+        ano_proximo_mes = ano_atual + 1
+    else:
+        proximo_mes = mes_atual + 1
+        ano_proximo_mes = ano_atual
+
     lista_dia = []
     lista_futuros = []
     lista_valor = []
 
     for jogo in partidas:
         utc_str = jogo["utcDate"]
-        # Transforma string em datetime UTC
         utc_dt = datetime.strptime(utc_str, "%Y-%m-%dT%H:%M:%SZ")
         utc_dt = utc.localize(utc_dt)
-        # Converte para horário de Brasília
         brasilia_dt = utc_dt.astimezone(brasilia)
         data_jogo_date = brasilia_dt.date()
 
@@ -77,10 +82,10 @@ if response.status_code == 200:
                 "Tem valor?": valor_aposta
             })
 
-        # Jogos futuros do mês atual (após hoje)
+        # Jogos futuros do mês atual E do próximo mês (após hoje)
         elif (status == "SCHEDULED" and
-              brasilia_dt.year == ano_atual and
-              brasilia_dt.month == mes_atual and
+              ((brasilia_dt.year == ano_atual and brasilia_dt.month == mes_atual) or
+               (brasilia_dt.year == ano_proximo_mes and brasilia_dt.month == proximo_mes)) and
               data_jogo_date > hoje_date):
             lista_futuros.append({
                 "Data": data_jogo_date.strftime('%Y-%m-%d'),
@@ -100,10 +105,10 @@ if response.status_code == 200:
             st.dataframe(df_dia, use_container_width=True)
 
     elif menu == "🔮 Jogos Futuros":
-        st.title(f"🔮 Próximos Jogos do Brasileirão em {ano_atual}-{mes_atual:02d}")
+        st.title(f"🔮 Próximos Jogos do Brasileirão em {ano_atual}-{mes_atual:02d} e {ano_proximo_mes}-{proximo_mes:02d}")
         df_futuros = pd.DataFrame(lista_futuros)
         if df_futuros.empty:
-            st.info("⚠️ Nenhum jogo futuro encontrado para o restante do mês.")
+            st.info("⚠️ Nenhum jogo futuro encontrado para os próximos meses.")
         else:
             st.dataframe(df_futuros, use_container_width=True)
 
