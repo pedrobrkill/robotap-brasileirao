@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 import random
 import pytz
 
@@ -82,11 +82,11 @@ if response.status_code == 200:
                 "Tem valor?": valor_aposta
             })
 
-        # Jogos futuros do mês atual E do próximo mês (após hoje)
+        # Jogos futuros do mês atual E do próximo mês (após agora)
         elif (status == "SCHEDULED" and
               ((brasilia_dt.year == ano_atual and brasilia_dt.month == mes_atual) or
                (brasilia_dt.year == ano_proximo_mes and brasilia_dt.month == proximo_mes)) and
-              data_jogo_date > hoje_date):
+              brasilia_dt > agora):
             lista_futuros.append({
                 "Data": data_jogo_date.strftime('%Y-%m-%d'),
                 "Hora": hora_jogo,
