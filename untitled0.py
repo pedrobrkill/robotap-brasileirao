@@ -44,7 +44,7 @@ if response.status_code == 200:
 
     # Filtrar para mostrar apenas os jogos do dia atual
     hoje = datetime.utcnow().strftime('%Y-%m-%d')  # Formato da API
-    display(df)
+    st.dataframe(df, use_container_width=True)
 
     print("Jogos do Brasileirão (Pré-live e Ao Vivo):")
     display(df)
