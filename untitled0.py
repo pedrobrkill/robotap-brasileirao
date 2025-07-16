@@ -1,125 +1,200 @@
 import streamlit as st
-import requests
-import pandas as pd
-from datetime import datetime
-import random
-import pytz
 
-st.set_page_config(page_title="Robô IA do Brasileirão", layout="wide")
+# --- CONFIGURAÇÃO DA PÁGINA ---
+# Usamos o layout "wide" para aproveitar melhor o espaço e definimos um título para a aba do navegador.
+st.set_page_config(layout="wide", page_title="Jogos do Dia")
 
-API_KEY = "92a41702d74e41fc85bd77effd476f44"
-headers = {'X-Auth-Token': API_KEY}
-url = "https://api.football-data.org/v4/competitions/BSA/matches"
+# --- DADOS DOS JOGOS ---
+# Em uma aplicação real, estes dados viriam de uma API ou de um web scraping.
+# Para este exemplo, vamos usar os mesmos dados fixos do exemplo anterior.
+# Você pode facilmente substituir esta lista por dados dinâmicos.
+matches_data = [
+    {
+        "league": "Brasileirão Série A",
+        "countryFlag": "🇧🇷",
+        "time": "19:00",
+        "homeTeam": {
+            "name": "Flamengo",
+            "logo": "https://s3.ap-southeast-1.amazonaws.com/images.deccanchronicle.com/dc-Cover-lcf2ab3e8b0a5a709565a5855234551e1-20220521152729.jpeg"
+        },
+        "awayTeam": {
+            "name": "Palmeiras",
+            "logo": "https://logodownload.org/wp-content/uploads/2015/05/palmeiras-logo-4.png"
+        },
+        "predictions": {
+            "home": "45%",
+            "draw": "30%",
+            "away": "25%"
+        },
+        "bothScore": "60%",
+        "over2_5": "55%"
+    },
+    {
+        "league": "Premier League",
+        "countryFlag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+        "time": "16:00",
+        "homeTeam": {
+            "name": "Man. United",
+            "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/7/7a/Manchester_United_FC_crest.svg/1200px-Manchester_United_FC_crest.svg.png"
+        },
+        "awayTeam": {
+            "name": "Liverpool",
+            "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/0/0c/Liverpool_FC.svg/1200px-Liverpool_FC.svg.png"
+        },
+        "predictions": {
+            "home": "35%",
+            "draw": "25%",
+            "away": "40%"
+        },
+        "bothScore": "70%",
+        "over2_5": "65%"
+    },
+    {
+        "league": "La Liga",
+        "countryFlag": "🇪🇸",
+        "time": "17:00",
+        "homeTeam": {
+            "name": "Real Madrid",
+            "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/5/56/Real_Madrid_CF.svg/1200px-Real_Madrid_CF.svg.png"
+        },
+        "awayTeam": {
+            "name": "Barcelona",
+            "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/4/47/FC_Barcelona_%28crest%29.svg/1200px-FC_Barcelona_%28crest%29.svg.png"
+        },
+        "predictions": {
+            "home": "50%",
+            "draw": "22%",
+            "away": "28%"
+        },
+        "bothScore": "62%",
+        "over2_5": "58%"
+    }
+]
 
-menu = st.sidebar.radio("Recursos", [
-    "🏟 Jogos do Dia",
-    "🔮 Jogos Futuros",
-    "🎯 Análise de Valor (Hoje)",
-    "💰 Gestão de Banca (em breve)"
-])
+# --- INJEÇÃO DE CSS E FONTES ---
+# Aqui injetamos o CSS do Tailwind, a fonte do Google Fonts e o CSS customizado
+# para o fundo e a barra de rolagem.
+# Isso é o que vai estilizar nossos cards de HTML.
+st.markdown("""
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        .stApp {
+            background-color: #111827; /* bg-gray-900 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Esconde a barra de menu do Streamlit e o footer */
+        #MainMenu, footer {
+            display: none;
+        }
+        /* Estilo para a barra de rolagem */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    </style>
+""", unsafe_allow_html=True)
 
-response = requests.get(url, headers=headers)
+# --- CABEÇALHO DA PÁGINA ---
+# Usamos st.markdown para criar um cabeçalho centralizado com as classes do Tailwind.
+st.markdown("""
+    <div class="text-center mb-8">
+        <h1 class="text-3xl md:text-4xl font-bold text-white">
+            🤖 Jogos do Dia
+        </h1>
+        <p class="text-gray-400 mt-2">Análises e probabilidades dos principais jogos de hoje.</p>
+    </div>
+""", unsafe_allow_html=True)
 
-if response.status_code == 200:
-    dados = response.json()
-    partidas = dados['matches']
 
-    utc = pytz.utc
-    brasilia = pytz.timezone("America/Sao_Paulo")
+# --- FUNÇÃO PARA CRIAR O CARD DE UM JOGO ---
+# Esta função recebe um dicionário com os dados de um jogo e retorna uma string HTML formatada.
+def create_match_card(match: dict) -> str:
+    """Gera o HTML para um único card de jogo."""
+    return f"""
+        <div class="bg-gray-800 rounded-lg shadow-lg p-4 md:p-6 transition-transform transform hover:scale-[1.02] mb-4 max-w-4xl mx-auto">
+            <!-- Cabeçalho do Card: Liga e País -->
+            <div class="flex items-center justify-between pb-3 border-b border-gray-700">
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">{match['countryFlag']}</span>
+                    <span class="font-semibold text-white">{match['league']}</span>
+                </div>
+            </div>
 
-    agora = datetime.now(brasilia)
-    ano_atual = agora.year
-    mes_atual = agora.month
-    hoje_date = agora.date()
+            <!-- Detalhes da Partida: Times e Horário -->
+            <div class="flex items-center justify-between my-4">
+                <!-- Time da Casa -->
+                <div class="flex flex-col items-center w-1/3 text-center">
+                    <img src="{match['homeTeam']['logo']}" alt="Logo {match['homeTeam']['name']}" class="w-12 h-12 md:w-16 md:h-16 object-contain rounded-full mb-2">
+                    <span class="font-bold text-sm md:text-base text-gray-200">{match['homeTeam']['name']}</span>
+                </div>
 
-    if mes_atual == 12:
-        proximo_mes = 1
-        ano_proximo_mes = ano_atual + 1
-    else:
-        proximo_mes = mes_atual + 1
-        ano_proximo_mes = ano_atual
+                <!-- Horário e VS -->
+                <div class="text-center">
+                    <span class="text-xl md:text-2xl font-bold text-gray-400">{match['time']}</span>
+                    <span class="text-xs text-gray-500 block">VS</span>
+                </div>
 
-    lista_dia = []
-    lista_futuros = []
-    lista_valor = []
+                <!-- Time Visitante -->
+                <div class="flex flex-col items-center w-1/3 text-center">
+                    <img src="{match['awayTeam']['logo']}" alt="Logo {match['awayTeam']['name']}" class="w-12 h-12 md:w-16 md:h-16 object-contain rounded-full mb-2">
+                    <span class="font-bold text-sm md:text-base text-gray-200">{match['awayTeam']['name']}</span>
+                </div>
+            </div>
 
-    for jogo in partidas:
-        utc_str = jogo["utcDate"]
-        utc_dt = datetime.strptime(utc_str, "%Y-%m-%dT%H:%M:%SZ")
-        utc_dt = utc.localize(utc_dt)
-        brasilia_dt = utc_dt.astimezone(brasilia)
-        data_jogo_date = brasilia_dt.date()
+            <!-- Seção de Probabilidades -->
+            <div class="bg-gray-900/50 rounded-lg p-3 mt-4">
+                <div class="grid grid-cols-3 gap-2 text-center text-xs md:text-sm">
+                    <div class="bg-green-500/20 text-green-300 p-2 rounded-md">
+                        <div class="font-bold text-lg">{match['predictions']['home']}</div>
+                        <div class="font-semibold">CASA</div>
+                    </div>
+                    <div class="bg-yellow-500/20 text-yellow-300 p-2 rounded-md">
+                        <div class="font-bold text-lg">{match['predictions']['draw']}</div>
+                        <div class="font-semibold">EMPATE</div>
+                    </div>
+                    <div class="bg-red-500/20 text-red-300 p-2 rounded-md">
+                        <div class="font-bold text-lg">{match['predictions']['away']}</div>
+                        <div class="font-semibold">FORA</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-2 text-center text-xs md:text-sm">
+                     <div class="bg-blue-500/20 text-blue-300 p-2 rounded-md">
+                        <div class="font-bold text-lg">{match['bothScore']}</div>
+                        <div class="font-semibold">AMBAS MARCAM</div>
+                    </div>
+                    <div class="bg-purple-500/20 text-purple-300 p-2 rounded-md">
+                        <div class="font-bold text-lg">{match['over2_5']}</div>
+                        <div class="font-semibold">MAIS DE 2.5 GOLS</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Botão de Ação (funcionalidade pode ser adicionada depois) -->
+            <div class="mt-4">
+                <a href="#" class="block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-center no-underline">
+                    Ver Análise Completa
+                </a>
+            </div>
+        </div>
+    """
 
-        hora_jogo = brasilia_dt.strftime('%H:%M')
-        time_a = jogo["homeTeam"]["name"]
-        time_b = jogo["awayTeam"]["name"]
-        status = jogo["status"]
-
-        # Jogos do dia (hoje)
-        if status in ["SCHEDULED", "LIVE"] and data_jogo_date == hoje_date:
-            lista_dia.append({
-                "Data": data_jogo_date.strftime('%Y-%m-%d'),
-                "Hora": hora_jogo,
-                "Time A": time_a,
-                "Time B": time_b,
-                "Status": status
-            })
-
-            odd_over25 = round(random.uniform(1.70, 2.30), 2)
-            prob_estimada = 0.60
-            ev = (prob_estimada * odd_over25) - 1
-            valor_aposta = "✅ Valor" if ev > 0 else "❌ Sem valor"
-
-            lista_valor.append({
-                "Time A": time_a,
-                "Time B": time_b,
-                "Odd Over 2.5": f"{odd_over25:.2f}",
-                "EV (60%)": f"{ev:.2f}",
-                "Tem valor?": valor_aposta
-            })
-
-        # Jogos futuros do mês atual E do próximo mês (data >= hoje)
-        elif (status == "SCHEDULED" and
-              ((brasilia_dt.year == ano_atual and brasilia_dt.month == mes_atual) or
-               (brasilia_dt.year == ano_proximo_mes and brasilia_dt.month == proximo_mes)) and
-              data_jogo_date >= hoje_date):
-            lista_futuros.append({
-                "Data": data_jogo_date.strftime('%Y-%m-%d'),
-                "Hora": hora_jogo,
-                "Time A": time_a,
-                "Time B": time_b,
-                "Status": status
-            })
-
-    if menu == "🏟 Jogos do Dia":
-        st.title("🏟 Jogos do Dia (Brasileirão)")
-        df_dia = pd.DataFrame(lista_dia)
-        if df_dia.empty:
-            st.info("⚠️ Não há jogos do Brasileirão para hoje.")
-        else:
-            st.dataframe(df_dia, use_container_width=True)
-
-    elif menu == "🔮 Jogos Futuros":
-        st.title(f"🔮 Próximos Jogos do Brasileirão em {ano_atual}-{mes_atual:02d} e {ano_proximo_mes}-{proximo_mes:02d}")
-        df_futuros = pd.DataFrame(lista_futuros)
-        if df_futuros.empty:
-            st.info("⚠️ Nenhum jogo futuro encontrado para os próximos meses.")
-        else:
-            st.dataframe(df_futuros, use_container_width=True)
-
-    elif menu == "🎯 Análise de Valor (Hoje)":
-        st.title("🎯 Análise de Valor - Over 2.5 (Somente Hoje)")
-        df_valor = pd.DataFrame(lista_valor)
-        if df_valor.empty:
-            st.info("⚠️ Nenhum jogo hoje para calcular valor.")
-        else:
-            st.dataframe(df_valor, use_container_width=True)
-
-    elif menu == "💰 Gestão de Banca (em breve)":
-        st.title("💰 Gestão de Banca")
-        st.warning("Essa funcionalidade estará disponível em breve.")
-
+# --- RENDERIZAÇÃO DOS CARDS ---
+# Itera sobre a lista de jogos e renderiza um card para cada um.
+if matches_data:
+    for match in matches_data:
+        html_card = create_match_card(match)
+        st.markdown(html_card, unsafe_allow_html=True)
 else:
-    st.error("Erro ao buscar dados da API.") 
+    # Mensagem para quando não houver jogos
+    st.markdown("""
+        <div class="bg-gray-800 rounded-lg p-8 text-center text-gray-400 max-w-4xl mx-auto">
+            <h3 class="text-xl font-semibold text-white">Nenhum jogo para hoje</h3>
+            <p>Volte mais tarde para conferir as partidas do dia.</p>
+        </div>
+    """, unsafe_allow_html=True)
 
-st.write(...)
