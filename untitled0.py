@@ -11,7 +11,7 @@ API_KEY = "92a41702d74e41fc85bd77effd476f44"
 headers = {'X-Auth-Token': API_KEY}
 url = "https://api.football-data.org/v4/competitions/BSA/matches"
 
-menu = st.sidebar.radio("📂 Navegação", [
+menu = st.sidebar.radio("Recursos", [
     "🏟 Jogos do Dia",
     "🔮 Jogos Futuros",
     "🎯 Análise de Valor (Hoje)",
