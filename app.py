@@ -9,7 +9,7 @@ import random
 
 # Configuração da página
 st.set_page_config(
-    page_title="RobôTip Clone - Análise de Apostas",
+    page_title="Robo Tap Brasil - Análise de Apostas",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -123,7 +123,7 @@ def generate_ai_stats():
 # Título principal
 st.markdown("""
 <div class="main-header">
-    <h1>🤖 RobôTip Clone - Análise Inteligente de Apostas</h1>
+    <h1>🤖 Robo Tap Brasil - Análise Inteligente de Apostas</h1>
     <p>Previsões esportivas baseadas em Inteligência Artificial</p>
 </div>
 """, unsafe_allow_html=True)
@@ -291,6 +291,6 @@ st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 2rem;">
     <p>⚠️ <strong>Aviso:</strong> Apostas esportivas envolvem riscos. Aposte com responsabilidade.</p>
-    <p>📧 Contato: suporte@robotip-clone.com | 📞 (11) 9999-9999</p>
+    <p>📧 Contato: suporte@robotapbrasil.com | 📞 (11) 9999-9999</p>
 </div>
 """, unsafe_allow_html=True)
