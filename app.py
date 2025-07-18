@@ -265,7 +265,13 @@ with tab1:
                 
                 with col3:
                     if show_predictions and 'previsao_ia' in jogo:
-                        confidence_class = "prediction-high" if jogo['confianca'] >= 80 else "prediction-medium" if jogo['confianca'] >= 70 else "prediction-low"
+                        # Corrigido: linha que estava causando erro
+                        if jogo['confianca'] >= 80:
+                            confidence_class = "prediction-high"
+                        elif jogo['confianca'] >= 70:
+                            confidence_class = "prediction-medium"
+                        else:
+                            confidence_class = "prediction-low"
                         
                         st.markdown(f"""
                         <div class="{confidence_class}">
@@ -305,7 +311,13 @@ with tab2:
                 
                 with col3:
                     if show_predictions and 'previsao_ia' in jogo:
-                        confidence_class = "prediction-high" if jogo['confianca'] >= 80 else "prediction-medium" if jogo['confianca'] >= 70 else "prediction-low"
+                        # Corrigido: linha que estava causando erro
+                        if jogo['confianca'] >= 80:
+                            confidence_class = "prediction-high"
+                        elif jogo['confianca'] >= 70:
+                            confidence_class = "prediction-medium"
+                        else:
+                            confidence_class = "prediction-low"
                         
                         st.markdown(f"""
                         <div class="{confidence_class}">
@@ -406,4 +418,45 @@ with tab4:
                 
                 with col3:
                     if show_predictions and 'previsao_ia' in jogo:
-                        confidence_class = "prediction-high" if jogo['confianca'] >= 80 else "prediction-medium" if jogo['confianca
+                        # Corrigido: linha que estava causando erro
+                        if jogo['confianca'] >= 80:
+                            confidence_class = "prediction-high"
+                        elif jogo['confianca'] >= 70:
+                            confidence_class = "prediction-medium"
+                        else:
+                            confidence_class = "prediction-low"
+                        
+                        st.markdown(f"""
+                        <div class="{confidence_class}">
+                            <strong>Previsão IA:</strong> {jogo['previsao_ia']}<br>
+                            <strong>Confiança:</strong> {jogo['confianca']}%
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                st.markdown("---")
+        else:
+            st.info("Nenhum jogo futuro encontrado no período selecionado")
+
+# Adicionar classificação na sidebar
+st.sidebar.markdown("---")
+st.sidebar.header("📊 Classificação Atual")
+
+try:
+    with st.spinner("Carregando classificação..."):
+        classificacao = api.get_standings()
+        
+        if not classificacao.empty:
+            # Mostrar top 6 na sidebar
+            top_6 = classificacao.head(6)
+            
+            for _, time in top_6.iterrows():
+                st.sidebar.write(f"{time['posicao']}º {time['time']} - {time['pontos']} pts")
+        else:
+            st.sidebar.write("Classificação indisponível")
+except:
+    st.sidebar.write("Erro ao carregar classificação")
+
+# Footer
+st.markdown("---")
+st.markdown("**🔄 Dados atualizados em tempo real** | **🤖 Powered by IA**")
+st.markdown("*Desenvolvido por Robo Tap Brasil*")
