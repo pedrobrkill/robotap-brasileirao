@@ -4,8 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import random
+import requests
 
 # Configuração da página
 st.set_page_config(
@@ -15,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS customizado para melhorar a aparência
+# CSS customizado
 st.markdown("""
 <style>
     .main-header {
@@ -25,14 +24,6 @@ st.markdown("""
         color: white;
         border-radius: 10px;
         margin-bottom: 2rem;
-    }
-    
-    .metric-card {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #007bff;
-        margin: 0.5rem 0;
     }
     
     .game-card {
@@ -61,236 +52,358 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Função para gerar dados fictícios de jogos
-@st.cache_data
-def generate_sample_games():
-    teams = [
-        "Flamengo", "Palmeiras", "São Paulo", "Corinthians", "Atlético-MG",
-        "Internacional", "Grêmio", "Botafogo", "Vasco", "Fluminense",
-        "Santos", "Cruzeiro", "Bahia", "Fortaleza", "Athletico-PR"
-    ]
-    
-    leagues = ["Brasileirão", "Copa do Brasil", "Libertadores", "Sul-Americana"]
-    
-    games = []
-    for i in range(20):
-        home_team = random.choice(teams)
-        away_team = random.choice([t for t in teams if t != home_team])
-        
-        # Gerar odds realistas
-        home_odds = round(random.uniform(1.5, 4.0), 2)
-        draw_odds = round(random.uniform(2.5, 3.8), 2)
-        away_odds = round(random.uniform(1.5, 4.0), 2)
-        
-        # Calcular probabilidades implícitas
-        home_prob = round((1/home_odds) * 100, 1)
-        draw_prob = round((1/draw_odds) * 100, 1)
-        away_prob = round((1/away_odds) * 100, 1)
-        
-        # Previsão da IA (simulada)
-        predictions = ["Casa", "Empate", "Visitante"]
-        ai_prediction = random.choice(predictions)
-        confidence = round(random.uniform(60, 95), 1)
-        
-        game = {
-            "Data": datetime.now() + timedelta(days=random.randint(0, 7)),
-            "Liga": random.choice(leagues),
-            "Casa": home_team,
-            "Visitante": away_team,
-            "Odds Casa": home_odds,
-            "Odds Empate": draw_odds,
-            "Odds Visitante": away_odds,
-            "Prob Casa (%)": home_prob,
-            "Prob Empate (%)": draw_prob,
-            "Prob Visitante (%)": away_prob,
-            "Previsão IA": ai_prediction,
-            "Confiança (%)": confidence
+class BrasileiraoAPI:
+    def __init__(self, api_key=None):
+        self.base_url = "https://api.football-data.org/v4"
+        self.headers = {
+            "X-Auth-Token": api_key if api_key else "YOUR_API_KEY_HERE"
         }
-        games.append(game)
+        self.brasileirao_id = 2013
     
-    return pd.DataFrame(games)
+    def get_matches_by_date_range(self, date_from, date_to):
+        url = f"{self.base_url}/competitions/{self.brasileirao_id}/matches"
+        params = {
+            "dateFrom": date_from,
+            "dateTo": date_to
+        }
+        
+        try:
+            response = requests.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            st.error(f"Erro na API: {e}")
+            return None
+    
+    def get_today_matches(self):
+        today = datetime.now().date().strftime("%Y-%m-%d")
+        data = self.get_matches_by_date_range(today, today)
+        
+        if data and 'matches' in data:
+            return self._process_matches_data(data['matches'], "hoje")
+        return pd.DataFrame()
+    
+    def get_tomorrow_matches(self):
+        tomorrow = (datetime.now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
+        data = self.get_matches_by_date_range(tomorrow, tomorrow)
+        
+        if data and 'matches' in data:
+            return self._process_matches_data(data['matches'], "amanha")
+        return pd.DataFrame()
+    
+    def get_past_matches(self, days_back=7):
+        date_to = datetime.now().date()
+        date_from = date_to - timedelta(days=days_back)
+        
+        data = self.get_matches_by_date_range(
+            date_from.strftime("%Y-%m-%d"),
+            date_to.strftime("%Y-%m-%d")
+        )
+        
+        if data and 'matches' in data:
+            return self._process_matches_data(data['matches'], "passados")
+        return pd.DataFrame()
+    
+    def get_future_matches(self, days_ahead=30):
+        date_from = datetime.now().date() + timedelta(days=1)
+        date_to = date_from + timedelta(days=days_ahead)
+        
+        data = self.get_matches_by_date_range(
+            date_from.strftime("%Y-%m-%d"),
+            date_to.strftime("%Y-%m-%d")
+        )
+        
+        if data and 'matches' in data:
+            return self._process_matches_data(data['matches'], "futuros")
+        return pd.DataFrame()
+    
+    def _process_matches_data(self, matches, tipo_jogo):
+        processed_matches = []
+        
+        for match in matches:
+            match_date = datetime.fromisoformat(match['utcDate'].replace('Z', '+00:00'))
+            match_date_br = match_date - timedelta(hours=3)
+            
+            processed_match = {
+                'id': match['id'],
+                'data': match_date_br.strftime('%Y-%m-%d'),
+                'hora': match_date_br.strftime('%H:%M'),
+                'data_completa': match_date_br,
+                'rodada': match.get('matchday', 'N/A'),
+                'status': match['status'],
+                'casa': match['homeTeam']['name'],
+                'casa_id': match['homeTeam']['id'],
+                'visitante': match['awayTeam']['name'],
+                'visitante_id': match['awayTeam']['id'],
+                'tipo_jogo': tipo_jogo
+            }
+            
+            if match['status'] == 'FINISHED':
+                processed_match.update({
+                    'gols_casa': match['score']['fullTime']['home'],
+                    'gols_visitante': match['score']['fullTime']['away'],
+                    'resultado': self._get_match_result(
+                        match['score']['fullTime']['home'],
+                        match['score']['fullTime']['away']
+                    )
+                })
+            else:
+                processed_match.update({
+                    'gols_casa': None,
+                    'gols_visitante': None,
+                    'resultado': None
+                })
+            
+            processed_matches.append(processed_match)
+        
+        return pd.DataFrame(processed_matches)
+    
+    def _get_match_result(self, home_goals, away_goals):
+        if home_goals > away_goals:
+            return "Casa"
+        elif away_goals > home_goals:
+            return "Visitante"
+        else:
+            return "Empate"
+    
+    def get_standings(self):
+        url = f"{self.base_url}/competitions/{self.brasileirao_id}/standings"
+        
+        try:
+            response = requests.get(url, headers=self.headers)
+            response.raise_for_status()
+            data = response.json()
+            
+            standings = []
+            for team in data['standings'][0]['table']:
+                standings.append({
+                    'posicao': team['position'],
+                    'time': team['team']['name'],
+                    'jogos': team['playedGames'],
+                    'vitorias': team['won'],
+                    'empates': team['draw'],
+                    'derrotas': team['lost'],
+                    'gols_pro': team['goalsFor'],
+                    'gols_contra': team['goalsAgainst'],
+                    'saldo_gols': team['goalDifference'],
+                    'pontos': team['points']
+                })
+            
+            return pd.DataFrame(standings)
+            
+        except requests.exceptions.RequestException as e:
+            st.error(f"Erro ao buscar classificação: {e}")
+            return pd.DataFrame()
 
-# Função para gerar estatísticas da IA
-@st.cache_data
-def generate_ai_stats():
-    return {
-        "taxa_acerto": 73.5,
-        "jogos_analisados": 1247,
-        "lucro_mes": 12.8,
-        "melhor_liga": "Brasileirão"
-    }
+# Função para simular previsões da IA
+def add_ai_predictions(df):
+    if df.empty:
+        return df
+    
+    df = df.copy()
+    predictions = ["Casa", "Empate", "Visitante"]
+    
+    for idx in df.index:
+        df.loc[idx, 'previsao_ia'] = np.random.choice(predictions)
+        df.loc[idx, 'confianca'] = np.random.randint(60, 95)
+    
+    return df
+
+# Inicializar a API
+@st.cache_resource
+def init_api():
+    return BrasileiraoAPI()
 
 # Título principal
 st.markdown("""
 <div class="main-header">
     <h1>🤖 Robo Tap Brasil - Análise Inteligente de Apostas</h1>
-    <p>Previsões esportivas baseadas em Inteligência Artificial</p>
+    <p>Dados reais do Brasileirão com previsões baseadas em IA</p>
 </div>
 """, unsafe_allow_html=True)
 
+# Inicializar API
+api = init_api()
+
 # Sidebar
-st.sidebar.header("⚙️ Filtros")
-selected_league = st.sidebar.selectbox("Liga", ["Todas", "Brasileirão", "Copa do Brasil", "Libertadores", "Sul-Americana"])
-selected_date = st.sidebar.date_input("Data", datetime.now().date())
-confidence_filter = st.sidebar.slider("Confiança Mínima (%)", 50, 95, 70)
-
-# Carregar dados
-games_df = generate_sample_games()
-ai_stats = generate_ai_stats()
-
-# Filtrar dados
-if selected_league != "Todas":
-    games_df = games_df[games_df["Liga"] == selected_league]
-
-games_df = games_df[games_df["Confiança (%)"] >= confidence_filter]
-
-# Métricas principais
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("Taxa de Acerto", f"{ai_stats['taxa_acerto']}%", "2.1%")
-
-with col2:
-    st.metric("Jogos Analisados", f"{ai_stats['jogos_analisados']:,}", "127")
-
-with col3:
-    st.metric("ROI Mensal", f"{ai_stats['lucro_mes']}%", "1.2%")
-
-with col4:
-    st.metric("Melhor Liga", ai_stats['melhor_liga'], "")
-
-# Separador
-st.markdown("---")
+st.sidebar.header("⚙️ Configurações")
+refresh_data = st.sidebar.button("🔄 Atualizar Dados")
+show_predictions = st.sidebar.checkbox("Mostrar Previsões IA", value=True)
 
 # Abas principais
-tab1, tab2, tab3, tab4 = st.tabs(["🏆 Jogos do Dia", "📊 Análise Detalhada", "📈 Estatísticas", "🎯 Dicas VIP"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏆 Jogos Hoje", "📅 Jogos Amanhã", "📊 Jogos Passados", "🔮 Jogos Futuros"])
 
 with tab1:
-    st.header("🏆 Jogos do Dia - Previsões da IA")
+    st.header("🏆 Jogos de Hoje")
     
-    if len(games_df) > 0:
-        # Ordenar por confiança
-        games_sorted = games_df.sort_values("Confiança (%)", ascending=False)
+    with st.spinner("Buscando jogos de hoje..."):
+        jogos_hoje = api.get_today_matches()
         
-        for idx, game in games_sorted.iterrows():
-            with st.container():
+        if not jogos_hoje.empty:
+            if show_predictions:
+                jogos_hoje = add_ai_predictions(jogos_hoje)
+            
+            for _, jogo in jogos_hoje.iterrows():
                 col1, col2, col3 = st.columns([3, 2, 2])
                 
                 with col1:
                     st.markdown(f"""
                     <div class="game-card">
-                        <h4>{game['Casa']} vs {game['Visitante']}</h4>
-                        <p><strong>Liga:</strong> {game['Liga']}</p>
-                        <p><strong>Data:</strong> {game['Data'].strftime('%d/%m/%Y')}</p>
+                        <h4>{jogo['casa']} vs {jogo['visitante']}</h4>
+                        <p><strong>Horário:</strong> {jogo['hora']}</p>
+                        <p><strong>Rodada:</strong> {jogo['rodada']}</p>
+                        <p><strong>Status:</strong> {jogo['status']}</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 with col2:
-                    st.markdown("**Odds:**")
-                    st.write(f"Casa: {game['Odds Casa']}")
-                    st.write(f"Empate: {game['Odds Empate']}")
-                    st.write(f"Visitante: {game['Odds Visitante']}")
+                    if jogo['gols_casa'] is not None:
+                        st.metric("Placar Final", f"{jogo['gols_casa']} x {jogo['gols_visitante']}")
+                        st.success(f"Resultado: {jogo['resultado']}")
+                    else:
+                        st.info("Jogo não iniciado")
                 
                 with col3:
-                    confidence_class = "prediction-high" if game['Confiança (%)'] >= 80 else "prediction-medium" if game['Confiança (%)'] >= 70 else "prediction-low"
-                    
+                    if show_predictions and 'previsao_ia' in jogo:
+                        confidence_class = "prediction-high" if jogo['confianca'] >= 80 else "prediction-medium" if jogo['confianca'] >= 70 else "prediction-low"
+                        
+                        st.markdown(f"""
+                        <div class="{confidence_class}">
+                            <strong>Previsão IA:</strong> {jogo['previsao_ia']}<br>
+                            <strong>Confiança:</strong> {jogo['confianca']}%
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                st.markdown("---")
+        else:
+            st.info("Nenhum jogo hoje no Brasileirão")
+
+with tab2:
+    st.header("📅 Jogos de Amanhã")
+    
+    with st.spinner("Buscando jogos de amanhã..."):
+        jogos_amanha = api.get_tomorrow_matches()
+        
+        if not jogos_amanha.empty:
+            if show_predictions:
+                jogos_amanha = add_ai_predictions(jogos_amanha)
+            
+            for _, jogo in jogos_amanha.iterrows():
+                col1, col2, col3 = st.columns([3, 2, 2])
+                
+                with col1:
                     st.markdown(f"""
-                    <div class="{confidence_class}">
-                        <strong>Previsão IA:</strong> {game['Previsão IA']}<br>
-                        <strong>Confiança:</strong> {game['Confiança (%)']}%
+                    <div class="game-card">
+                        <h4>{jogo['casa']} vs {jogo['visitante']}</h4>
+                        <p><strong>Horário:</strong> {jogo['hora']}</p>
+                        <p><strong>Rodada:</strong> {jogo['rodada']}</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
+                with col2:
+                    st.info("Aguardando jogo")
+                
+                with col3:
+                    if show_predictions and 'previsao_ia' in jogo:
+                        confidence_class = "prediction-high" if jogo['confianca'] >= 80 else "prediction-medium" if jogo['confianca'] >= 70 else "prediction-low"
+                        
+                        st.markdown(f"""
+                        <div class="{confidence_class}">
+                            <strong>Previsão IA:</strong> {jogo['previsao_ia']}<br>
+                            <strong>Confiança:</strong> {jogo['confianca']}%
+                        </div>
+                        """, unsafe_allow_html=True)
+                
                 st.markdown("---")
-    else:
-        st.warning("Nenhum jogo encontrado com os filtros aplicados.")
-
-with tab2:
-    st.header("📊 Análise Detalhada")
-    
-    if len(games_df) > 0:
-        # Gráfico de distribuição de odds
-        fig = px.histogram(games_df, x="Odds Casa", nbins=20, title="Distribuição das Odds para Casa")
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Gráfico de confiança por liga
-        confidence_by_league = games_df.groupby("Liga")["Confiança (%)"].mean().reset_index()
-        fig2 = px.bar(confidence_by_league, x="Liga", y="Confiança (%)", title="Confiança Média por Liga")
-        st.plotly_chart(fig2, use_container_width=True)
-        
-        # Tabela detalhada
-        st.subheader("Tabela Completa")
-        st.dataframe(games_df.style.format({
-            "Odds Casa": "{:.2f}",
-            "Odds Empate": "{:.2f}",
-            "Odds Visitante": "{:.2f}",
-            "Prob Casa (%)": "{:.1f}%",
-            "Prob Empate (%)": "{:.1f}%",
-            "Prob Visitante (%)": "{:.1f}%",
-            "Confiança (%)": "{:.1f}%"
-        }))
+        else:
+            st.info("Nenhum jogo amanhã no Brasileirão")
 
 with tab3:
-    st.header("📈 Estatísticas da IA")
+    st.header("📊 Jogos Passados")
     
-    col1, col2 = st.columns(2)
+    days_back = st.slider("Dias para buscar", 1, 30, 7)
     
-    with col1:
-        st.subheader("Performance Geral")
+    with st.spinner("Buscando jogos passados..."):
+        jogos_passados = api.get_past_matches(days_back)
         
-        # Gráfico de pizza - distribuição de previsões
-        prediction_counts = games_df["Previsão IA"].value_counts()
-        fig = px.pie(values=prediction_counts.values, names=prediction_counts.index, 
-                    title="Distribuição das Previsões")
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        st.subheader("Confiança por Tipo de Previsão")
-        
-        confidence_by_prediction = games_df.groupby("Previsão IA")["Confiança (%)"].mean().reset_index()
-        fig = px.bar(confidence_by_prediction, x="Previsão IA", y="Confiança (%)", 
-                    title="Confiança Média por Tipo de Previsão")
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Métricas adicionais
-    st.subheader("Métricas Avançadas")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        avg_confidence = games_df["Confiança (%)"].mean()
-        st.metric("Confiança Média", f"{avg_confidence:.1f}%")
-    
-    with col2:
-        high_confidence_games = len(games_df[games_df["Confiança (%)"] >= 80])
-        st.metric("Jogos Alta Confiança", high_confidence_games)
-    
-    with col3:
-        avg_odds = games_df["Odds Casa"].mean()
-        st.metric("Odds Média Casa", f"{avg_odds:.2f}")
+        if not jogos_passados.empty:
+            # Filtrar apenas jogos finalizados
+            jogos_finalizados = jogos_passados[jogos_passados['status'] == 'FINISHED']
+            
+            if not jogos_finalizados.empty:
+                st.subheader("Resultados dos Jogos")
+                
+                for _, jogo in jogos_finalizados.iterrows():
+                    col1, col2, col3 = st.columns([3, 2, 2])
+                    
+                    with col1:
+                        st.markdown(f"""
+                        <div class="game-card">
+                            <h4>{jogo['casa']} vs {jogo['visitante']}</h4>
+                            <p><strong>Data:</strong> {jogo['data']}</p>
+                            <p><strong>Rodada:</strong> {jogo['rodada']}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.metric("Placar Final", f"{jogo['gols_casa']} x {jogo['gols_visitante']}")
+                        
+                        if jogo['resultado'] == "Casa":
+                            st.success(f"Vitória: {jogo['casa']}")
+                        elif jogo['resultado'] == "Visitante":
+                            st.success(f"Vitória: {jogo['visitante']}")
+                        else:
+                            st.info("Empate")
+                    
+                    with col3:
+                        # Mostrar estatísticas do jogo
+                        st.write("**Estatísticas:**")
+                        st.write(f"Gols: {jogo['gols_casa'] + jogo['gols_visitante']}")
+                    
+                    st.markdown("---")
+                
+                # Gráfico de resultados
+                if len(jogos_finalizados) > 0:
+                    st.subheader("Distribuição de Resultados")
+                    result_counts = jogos_finalizados['resultado'].value_counts()
+                    fig = px.pie(values=result_counts.values, names=result_counts.index, 
+                                title="Distribuição de Resultados nos Últimos Jogos")
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Nenhum jogo finalizado no período selecionado")
+        else:
+            st.info("Nenhum jogo encontrado no período selecionado")
 
 with tab4:
-    st.header("🎯 Dicas VIP")
+    st.header("🔮 Próximos Jogos")
     
-    st.warning("⚠️ Esta seção está disponível apenas para assinantes VIP")
+    days_ahead = st.slider("Dias para buscar", 1, 60, 30)
     
-    st.markdown("""
-    ### Benefícios da Assinatura VIP:
-    - 🎯 Dicas exclusivas com maior taxa de acerto
-    - 📱 Alertas em tempo real
-    - 📊 Análises mais detalhadas
-    - 🔔 Notificações de oportunidades
-    - 💰 Estratégias de bankroll
-    """)
-    
-    if st.button("Assinar VIP - R$ 29,90/mês"):
-        st.success("Redirecionando para o pagamento...")
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style="text-align: center; color: #666; padding: 2rem;">
-    <p>⚠️ <strong>Aviso:</strong> Apostas esportivas envolvem riscos. Aposte com responsabilidade.</p>
-    <p>📧 Contato: suporte@robotapbrasil.com | 📞 (11) 9999-9999</p>
-</div>
-""", unsafe_allow_html=True)
+    with st.spinner("Buscando próximos jogos..."):
+        jogos_futuros = api.get_future_matches(days_ahead)
+        
+        if not jogos_futuros.empty:
+            if show_predictions:
+                jogos_futuros = add_ai_predictions(jogos_futuros)
+            
+            st.subheader("Calendário de Jogos")
+            
+            for _, jogo in jogos_futuros.iterrows():
+                col1, col2, col3 = st.columns([3, 2, 2])
+                
+                with col1:
+                    st.markdown(f"""
+                    <div class="game-card">
+                        <h4>{jogo['casa']} vs {jogo['visitante']}</h4>
+                        <p><strong>Data:</strong> {jogo['data']}</p>
+                        <p><strong>Horário:</strong> {jogo['hora']}</p>
+                        <p><strong>Rodada:</strong> {jogo['rodada']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    st.info("Aguardando jogo")
+                
+                with col3:
+                    if show_predictions and 'previsao_ia' in jogo:
+                        confidence_class = "prediction-high" if jogo['confianca'] >= 80 else "prediction-medium" if jogo['confianca
